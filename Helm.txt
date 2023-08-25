@@ -1,0 +1,689 @@
+Regarding Helm and information concerning Helm releases' metadata stored within Kubernetes Secrets
+
+
+
+"Summary of Helm Part 2 (K8s Session 10):
+1. Exploring the directory structure for Helm.
+2. Creating a Helm chart.
+3. Modifying a Helm chart.
+4. Creating a pod.yaml file under the templates directory to template multiple YAML files. Deleting all defaults from the values.yaml file and making necessary modifications.
+5. Creating a values.yaml file to define values for templating during Helm installation.
+6. Monitoring Helm releases and corresponding pods in Kubernetes.
+7. Verifying Helm manifests and values.
+8. Gaining insights into information associated with Helm releases' metadata through Kubernetes Secrets.
+9. Decoding an encoded Helm release step by step from a Secret.
+10. Using helm update.
+11. Exploring helm history.
+12. Performing a helm rollback
+
+Helm Commands
+
+- helm rollback <RELEASE> [REVISION]
+- helm get values [RELEASE NAME] - -revision 2
+- helm get manifest [RELEASE NAME] - -revision 4
+- helm init
+- helm install [NAME] [CHART] flags]
+- helm list -A
+- helm get manifest [RELEASE NAME]
+- helm get values [RELEASE NAME]
+- helm uninstall [RELEASE NAME] -n [NAMESPACE]
+- helm upgrade [RELEASE NAME] -f values.yaml
+- helm history [RELEASE NAME]
+- kubectl get secrets
+- helm rollback <RELEASE> [REVISION] [flags]
+- helm install currency-usd-microservice . -f values.usd.yaml - - dry-run
+- kubectl get secrets sh.helm.release.v1.currency-jpy-microservice.v1 -o jsonpath='{.data.release}' | base64 -d | base64 -d | gzip -d | jq
+- kubectl get secrets sh.helm.release.v1.currency-jpy-microservice.v1 -o json | jq .data.release | tr -d '"' | base64 -d | base64 -d | gzip -d
+- kubectl get secrets sh.helm.release.v1.currency-jpy-microservice.v1 -o json | jq .data.release | tr -d '"' | base64 -d | base64 -d
+
+
+Create the directory according to the structure below
+
+vagrant@HelloCloud-Boxes:~$ cd helm-cop/
+vagrant@HelloCloud-Boxes:~/helm-cop$ mkdir 1-svc_and_ep
+vagrant@HelloCloud-Boxes:~/helm-cop$ cd 1-svc_and_ep/
+vagrant@HelloCloud-Boxes:~/helm-cop/1-svc_and_ep$touch currencyJPY-pod.yaml currencySGD-pod.yaml currencyUSD-pod.y
+
+
+currencyJPY-pod.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: currency-jpy-app
+  labels:
+    app: jpy-microservice
+spec:
+  containers:
+  - name: currency-JPY
+    image: hashicorp/http-echo:0.2.3
+    args:
+      - "-text=feature available in JPY"
+      - -listen=:8083
+
+- 
+    
+    ```tsx
+    apiVersion: v1
+    kind: Pod
+    metadata:
+      name: currency-jpy-app
+      labels:
+        app: jpy-microservice
+    spec:
+      containers:
+      - name: currency-JPY
+        image: hashicorp/http-echo:0.2.3
+        args:
+          - "-text=feature available in JPY"
+          - -listen=:8083
+    ```
+    
+- currencySGD-pod.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: currency-sgd-app
+  labels:
+    app: sgd-microservice
+spec:
+  containers:
+  - name: currency-SGD
+    image: hashicorp/http-echo:0.2.3
+    args:
+      - "-text=feature available in SGD"
+      - -listen=:8082
+
+currencyUSD-pod.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: currency-usd-app
+  labels:
+    app: usd-microservice
+spec:
+  containers:
+  - name: currency-USD
+    image: hashicorp/http-echo:0.2.3
+    args:
+      - "-text=feature available in USD"
+      - -listen=:8081
+
+
+Helm Create 
+
+vagrant@HelloCloud-Boxes:~/helm-cop/1-svc_and_ep$ helm create currency-app
+Creating currency-app
+vagrant@HelloCloud-Boxes:~/helm-cop/1-svc_and_ep$ ls
+currency-app          currencySGD-pod.yaml
+currencyJPY-pod.yaml  currencyUSD-pod.yaml
+vagrant@HelloCloud-Boxes:~/helm-cop/1-svc_and_ep$
+
+
+- **Remove default yaml files under helm template**
+
+vagrant@HelloCloud-Boxes:~/helm-cop/1-svc_and_ep/currency-app$ cd templates/
+vagrant@HelloCloud-Boxes:~/helm-cop/1-svc_and_ep/currency-app/templates$ ls
+deployment.yaml  hpa.yaml      NOTES.txt            service.yaml
+_helpers.tpl     ingress.yaml  serviceaccount.yaml  tests
+vagrant@HelloCloud-Boxes:~/helm-cop/1-svc_and_ep/currency-app/templates$ rm -rf deployment.yaml hpa.yaml service.yaml serviceaccount.yaml ingress.yaml 
+vagrant@HelloCloud-Boxes:~/helm-cop/1-svc_and_ep/currency-app/templates$ ls
+_helpers.tpl  NOTES.txt  tests
+
+
+- **Modify helm chart.yaml**
+
+Before helm chart.yaml
+
+apiVersion: v2
+name: currency-app
+description: A Helm chart for Kubernetes
+
+# A chart can be either an 'application' or a 'library' chart.
+#
+# Application charts are a collection of templates that can be packaged into versioned archives
+# to be deployed.
+#
+# Library charts provide useful utilities or functions for the chart developer. They're included as
+# a dependency of application charts to inject those utilities and functions into the rendering
+# pipeline. Library charts do not define any templates and therefore cannot be deployed.
+type: application
+
+# This is the chart version. This version number should be incremented each time you make changes
+# to the chart and its templates, including the app version.
+# Versions are expected to follow Semantic Versioning (https://semver.org/)
+version: 0.1.0
+
+# This is the version number of the application being deployed. This version number should be
+# incremented each time you make changes to the application. Versions are not expected to
+# follow Semantic Versioning. They should reflect the version the application is using.
+# It is recommended to use it with quotes.
+appVersion: "1.16.0"
+
+
+Modifid helm chart.yaml
+
+apiVersion: v2
+name: currency-app
+description: A Helm chart for Kubernetes
+
+# A chart can be either an 'application' or a 'library' chart.
+#
+# Application charts are a collection of templates that can be packaged into versioned archives
+# to be deployed.
+#
+# Library charts provide useful utilities or functions for the chart developer. They're included as
+# a dependency of application charts to inject those utilities and functions into the rendering
+# pipeline. Library charts do not define any templates and therefore cannot be deployed.
+type: application
+
+# This is the chart version. This version number should be incremented each time you make changes
+# to the chart and its templates, including the app version.
+# Versions are expected to follow Semantic Versioning (https://semver.org/)
+version: 0.1.0
+
+# This is the version number of the application being deployed. This version number should be
+# incremented each time you make changes to the application. Versions are not expected to
+# follow Semantic Versioning. They should reflect the version the application is using.
+# It is recommended to use it with quotes.
+appVersion: "1.16.0"
+
+
+
+
+- **Create a pod.yaml under template to template numerous yaml fiel and delete all default of value.yaml file and modify value.yaml file**
+
+pod.yaml (templated)
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: currency-{{ .Values.currencycode }}-app
+  labels:
+    app: {{ .Values.currencycode }}-microservice
+spec:
+  containers:
+  - name: currency-{{ .Values.currencycode }}
+    image: hashicorp/http-echo:0.2.3
+    args:
+      - "-text=feature available in {{ .Values.currencycode }}"
+      - -listen=:{{ .Values.port }}
+
+Default Value. File
+
+# Default values for currency-app.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  repository: nginx
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: chart-example.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+
+Modified Value.yaml File
+
+currencycode: JPY
+port: 8003
+
+
+
+Create value.yaml files for SGD,JPY,USD currency microservice under 1-svc_and_evc directory And delete currencyJPY-pod.yaml,currency-SGD-pod.yaml,currency-USD-pod.yaml
+
+touch vlaues-jpy.yaml values-usd.yaml values-sgd.yaml
+vagrant@HelloCloud-Boxes:~/helm-cop/1-svc_and_ep$ ls
+currency-app          currencySGD-pod.yaml  values-sgd.yaml  vlaues-jpy.yaml
+currencyJPY-pod.yaml  currencyUSD-pod.yaml  values-usd.yaml
+
+vagrant@HelloCloud-Boxes:~/helm-cop/1-svc_and_ep$ rm currencySGD-pod.yaml currencyUSD-pod.yaml currencyJPY-pod.yaml 
+vagrant@HelloCloud-Boxes:~/helm-cop/1-svc_and_ep$ ls
+currency-app  values-sgd.yaml  values-usd.yaml  vlaues-jpy.yaml
+vagrant@HelloCloud-Boxes:~/helm-cop/1-svc_and_ep$
+
+
+
+- **Helm Install** (release name) (chart)
+
+**helm install currency-usd-miscroserive(Releasename)  ./currency-app/(chart) -f values-usd.yaml (file name,if we put that file , helm will install defautl )  --dry-run**
+
+**Note: delete testconnection.yaml fiel under template/test. And NOTES.txt as well.**
+
+**helm uninstall release name**
+
+
+helm install currency-usd-miscroserive ./currency-app/ -f values-usd.yaml --dry-run
+NAME: currency-usd-miscroserive
+LAST DEPLOYED: Wed Aug 23 14:51:54 2023
+NAMESPACE: default
+STATUS: pending-install
+REVISION: 1
+TEST SUITE: None
+HOOKS:
+MANIFEST:
+---
+# Source: currency-app/templates/pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: currency-USD-app
+  labels:
+    app: USD-microservice
+spec:
+  containers:
+  - name: currency-USD
+    image: hashicorp/http-echo:0.2.3
+    args:
+      - "-text=feature available in USD"
+      - -listen=:8001
+
+
+
+helm install currency-usd-miscroserive ./currency-app/ -f values-usd.yaml
+NAME: currency-usd-miscroserive
+LAST DEPLOYED: Wed Aug 23 15:02:25 2023
+NAMESPACE: default
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+
+
+helm install 
+
+helm install currency-jpy-miscroserive ./currency-app/ -f values-jpy.yaml
+helm install currency-jpy-miscroserive ./currency-app/ -f values-jpy.yaml
+
+- **watch helm list -A & watch kubectl get pod command**
+    
+    ![Untitled](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/da541c83-1ce7-4762-b369-7ab610999d58/Untitled.png)
+
+
+
+
+**In the current condition, if we provide someone with a Helm chart file, they can deploy it after creating a value file according to their requirements.**
+
+- **helm get manifest release name**
+- **helm get values release name**
+
+vagrant@HelloCloud-Boxes:~/helm-cop/1-svc_and_ep$ helm get manifest currency-sgd-miscroserive
+---
+# Source: currency-app/templates/pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: currency-sgd-app
+  labels:
+    app: sgd-microservice
+spec:
+  containers:
+  - name: currency-sgd
+    image: hashicorp/http-echo:0.2.3
+    args:
+      - "-text=feature available in sgd"
+      - -listen=:8002
+
+vagrant@HelloCloud-Boxes:~/helm-cop/1-svc_and_ep$ helm get values currency-sgd-miscroserive
+USER-SUPPLIED VALUES:
+currencycode: sgd
+port: 8002
+vagrant@HelloCloud-Boxes:~/helm-cop/1-svc_and_ep$
+
+
+
+- **We can observe information related to Helm releases' metadata within Kubernetes Secrets. This data is utilized by Helm to track releases and their associated information**
+
+kubectl get secret
+NAME                                              TYPE                 DATA   AGE
+sh.helm.release.v1.currency-jpy-miscroserive.v1   helm.sh/release.v1   1      19m
+sh.helm.release.v1.currency-sgd-miscroserive.v1   helm.sh/release.v1   1      21m
+sh.helm.release.v1.currency-usd-miscroserive.v1   helm.sh/release.v1   1      28m
+
+
+- **Type kubeclt get secret *secrectname -o yaml***
+
+kubectl get secret sh.helm.release.v1.currency-jpy-miscroserive.v1 -o yaml
+apiVersion: v1
+data:
+  release: SDRzSUFBQUFBQUFDLzV4WVhYT2J1QnIrS3g3T2JaTEZVTnJZTTcwd05JQXdkbXM3UnFDVE16dENFSkF0Z1dyQU50N3BmejhqL0JHM1NidmJ2Y2dFR2VuOWVON24vUkIvS1FYbXFUSlVTTFBacEFWcGIxZWl2ZVcwSXB1eVNqZDBteW8zQ2kyZVMyWDRsL0pNTjFYOVo1SUtWclpwb2d3VlRkWDBXL1grVnRNZis4YXdydzZORDNmNi9VRFRqWUg2SGlrM0NzTy9lU0JKV1ZwM1c3dEZSVFpVMUxRc2xLRUNpcXJHalBWSXlZWGNwTndvVlkzcnBsS0d5a1hGdHh1RjVIaFRTM041V3VNRTExZysvK2dsRmtLNVViYnBwam9LVisvNmQrb3JsYU9lbXpMZTZ5VDJuc3ROenpxZDcwM29FYUF0SmRJUUxHaHdrYlhWdWw5RThFcDYzUXBwQlJhQ1VZSTdKZDl1RkZhU3RUSXNHc1p1bERybGd1RTZyWlRoZnk5V1gzNzg0ODg4WlNMZFZIZTFZTkxhempzbDFhdnRPQk4yNnBwNXpHZFo0dVFNT0VZZXcyVVdhOUZwUFMyajBGUDlyUHpxNi8yQlZkUWYvSVc1UmhDSm1DOHp3S2Q5VW5nczVsUERoL2FPV0VZVHdUNERkRlEvaCtvNDFhc2FPSE9HdU4yUDNWbm1yMC95MWtjOVBrTjU3QWFNdE1kemp6cGlwUEFFY3BiWnMyV3FwQWlhcUIxcGs5YThCKzY4eGJEL21FREVjWmhsZ0tvVXVCZWJtUFJCNnV6V2JUbWU2UjZMd2prRHprT0duSUJIWVZBbGxza1R1Sy9TaGJsUG9GMWhpQVNDc3l3S3pkM0o5OFppQ1pPNkVtaXNqdWR0Rlh5S0RpY3NEc0R4V0tUWmZhSXRNNklOYXJRdy9RUjZqSENESlU1d09HT0lPR094TXo4QXgyN1J3cXd3N0l2RUNkYkFuVytCT3k5eE9NbkdqbWZJWjdRd0h4N1pKSXU1WFdOb0ZNQ2Q3aENjQ0Q4VEhxSm1pK0NlUmVIMEVwOUlHelNKWTR1NG1HU1JsdWVrbUhWbjBjSVVpV1hxR080cmFTZHdnOFBSdjBrV0xZNitYL3lrNWZiN0dMRUdMVVkwMG9PVzhLQ0o5SFV0Y2ZFNTZzZk8vbzI0TWc0c0EwWnczMGZocEVGRlVNV2Q3T0JMd3FVTXRrWUxjL0E4RXgvU1ZyMk9kV2RIWis5eW9LSFFhekdjTStEdXNzVDErakdmWk5QVjVCaC96dXFsSG5ERTJUdGdnUnJRRjNrSTdnL1g4cjBUTnA5WDZsVzhSODNzaUUvejJPRXphZ0p1VndrTURqNy91YTBZUnQ5aGZKYnRNNC9GVHBBVGJYbVNkKzNmcTNmM1p4NTEvRG42SitKZzJrY2NpZFFhVVg4QnNoYzhnMHB5NnJKMnpSWkRRMFYwUkwxd1VudmhoQUxMV0p5NWNNNmhzMjMvTmw5T3VodGtYV05yckx1OW1WemZmN1hXMHhaQlcwVUxjNFVkdTAwczg4Z0h4NWJuWkF3UEdBNGE0TmlIQytlSzlYYzFCRGo3UE9KQjlSdTE1S1FMWkg1NDJiOGpuRFdKRTJXQUJnZC9FUndBZlIzajh6cVFzZFhZTnFZU0Q0OFJhWU8yekFDdEtMQzhaMEIvTzBZbm5NcnhxWDUraXJWK0hXdnZzdGl4cWVUa1A4K3JJeDZrUGZuSGN4WTdha08wYkh2SzZmZkFyVDhBaHpXUnR1L0xtdmhMakM2NVlZcVlUNnRFNXBUbHJaTFFheEUwVnVtaW54TjMxQkF0cUJDY3FySHVUU0xvc2RpVnZIcVgvWkRYbjQ1eURaTzRKcnpFVjNLQ2QzbzMxelhQNTJ6cmQ3VjdLbUx0M2RIdW44cllaU1FNdG9temZJdC9uWTFZRHlnS3ZRYUZjMWt2Uk53TzZnZ2FPZEtDdFE4OTR6TTFQNlR0cUZseTZZdDlRQXZqRVlXZWh1R1UvYW9uTEMrK2c5K1BWekdWK2IxS25FSDdlRHA3cm9mSGVOYjlpQWR0ekFOVjFrTU03N2Rkalhzc3MxU3ZNZ3lOVmV3RzY3ZTUwT1h3SlE0L2s0ZWhjVWdjdTRtMDVSbmpWL1hnVjF3bFBNZ2w3bS8yZW5mS1NJR0V6SThJVGxleEhqU0paYXB4YThwZU54N1R3VXQ5Y0FLT29mRXpmclVKWnl1MHRGZVJOdWpIeGZ6ejMvV08xMmRtVFhUdTMrNTN0U0pQNEY0RlZ2NUxqci8wb2c1VDhYZTY0aDlxK1krOTVhcWYwSmRuY04zVERtZit6UzdZbldhaHY2MjU1VWZsMjgwYmM1c29rN3NXODZ1WkxRcE5jYWxwcXpKTFZnOWpyTEVHZlNxenBUTllXN3pQRXNkZVIrRTgvNXlWMlNuRzc0RnpWVGZDampjWFBGNjR5RmF4ZHNTN3F5MGplZjVVb3c3bEdGaWpERGoyam53Njh2bks5eGY4NFhTTGpubGR4NUN0Q0I5Y2NMR0ticVo1YjlIUlMyK1Z2aHhsMS8vV1Zpa1BXS2FJb1YzSVhNT09mY0FPVzhXNnQvTzFYRTNjVVkzZ3RJd1A1YzVmZ1dheUt6UHBTeFI2eGNVdmE1VDVpeEgxd3psTDNka0F5VHh4QXptMzVRbTNoYXdWc2JQTU1IejNUM3luUjV2a241cjVjQytJUG1meFNuMy93OWxkckh2cXhZZlJ4NC9LdC8vZEtGdk1Ham5LLzNXNWVKQXlrY3p3dmtUS2pTSktlVkc1VjFYOTI0MVNrVHpsK0h3UGVLYnMrenZBWFo0eVRyT2kzS1F2SkFLdE9ZdkN1U29MTEdtN0JCZElNN2FFTDdORXkxbE1UWnBBVmlHSE5hZzFkeEdjYmlLWU1OSytHNFBXWEdLSEhZQTc3UlBYM0pKaUxwOUwxQTJXU1JWcklJdWhyVWFhVEZCU3lhWWJPN2FLUThTQWErYUprMzMvWGc0UW8zSUZISU1oelZhN0JtSGxPOElEanNPY0lUbk1odk1TV0EvQ3ArYVhtTzhONEF3YXREQjNaeCtBYXpKQzVZQnRNRDhybTdrOWZWN3FjK21QdFBmU29JUDE5QkU0YzBHS3lkam5pVWlzKytOL2h4VXhIN1JvVmpaUklWcC9kL3lQWWRMRXVzY3NhcFNvbFh2ejR1cTNROExmYlMwNnlXYmFvSTY3NGNmTEk2M3VFOHZrR080WjJaVmYvV0txazFINTFlZGVqcnYxdkQ2dUJ5MkdaRHd1T2t4aEZIb2kxb01EZUdBUDgzQXk5Z3V6alRYQkluMDI5dVZ3Q2grMkZpMmJ4T252Q0I5OHRhaWhFYTBqM05iS091TElTMnhaUE5Qc0RlYXNSUHNqY3pndTZITmExY3BRdWIyOWZTciswMXVVellha3c5NzFkZmVQMTlYb3FYaTV0dzU3Mi81VHNhWkZNdXg5S1pPbjRueDdIajRWdlo0azRaVzRsZWhFeWpjTXh5bXJ1azI5SGhaaTJEdCtRSGk1SGo4VmxVaEp0NE9VUlkxcGtXNk9CMjdma0hzVVJEbk8wbUV2eDFWT1Nia1JmK1IxTFc1VGtwZEQ5VTY3MDAvcU50bFpzeFQycE56VzZiNysrSnppdXRta1BiekZsT0dZcFQxYVNLdWVsSmU5dDR4V2RWcDg3REI4S3E2L0JmUnZ1cHlyQkNacDkybmhHVGVzVnI3OVB3QUEvLy91Umd6MEt4RUFBQT09
+kind: Secret
+metadata:
+  creationTimestamp: "2023-08-23T15:10:57Z"
+  labels:
+    modifiedAt: "1692803458"
+    name: currency-jpy-miscroserive
+    owner: helm
+    status: deployed
+    version: "1"
+  name: sh.helm.release.v1.currency-jpy-miscroserive.v1
+  namespace: default
+  resourceVersion: "11438"
+  uid: 045f5a44-78d0-4aff-a50b-f40b8e0f9cb6
+type: helm.sh/release.v1
+vagrant@HelloCloud-Boxes:~/helm-cop/1-svc_and_ep$
+
+
+
+- **Type kubeclt get secret *secrectname -o json***
+
+vagrant@HelloCloud-Boxes:~/helm-cop/1-svc_and_ep$ kubectl get secret sh.helm.release.v1.currency-jpy-miscroserive.v1 -o json
+{
+    "apiVersion": "v1",
+    "data": {
+        "release": "SDRzSUFBQUFBQUFDLzV4WVhYT2J1QnIrS3g3T2JaTEZVTnJZTTcwd05JQXdkbXM3UnFDVE16dENFSkF0Z1dyQU50N3BmejhqL0JHM1NidmJ2Y2dFR2VuOWVON24vUkIvS1FYbXFUSlVTTFBacEFWcGIxZWl2ZVcwSXB1eVNqZDBteW8zQ2kyZVMyWDRsL0pNTjFYOVo1SUtWclpwb2d3VlRkWDBXL1grVnRNZis4YXdydzZORDNmNi9VRFRqWUg2SGlrM0NzTy9lU0JKV1ZwM1c3dEZSVFpVMUxRc2xLRUNpcXJHalBWSXlZWGNwTndvVlkzcnBsS0d5a1hGdHh1RjVIaFRTM041V3VNRTExZysvK2dsRmtLNVViYnBwam9LVisvNmQrb3JsYU9lbXpMZTZ5VDJuc3ROenpxZDcwM29FYUF0SmRJUUxHaHdrYlhWdWw5RThFcDYzUXBwQlJhQ1VZSTdKZDl1RkZhU3RUSXNHc1p1bERybGd1RTZyWlRoZnk5V1gzNzg0ODg4WlNMZFZIZTFZTkxhempzbDFhdnRPQk4yNnBwNXpHZFo0dVFNT0VZZXcyVVdhOUZwUFMyajBGUDlyUHpxNi8yQlZkUWYvSVc1UmhDSm1DOHp3S2Q5VW5nczVsUERoL2FPV0VZVHdUNERkRlEvaCtvNDFhc2FPSE9HdU4yUDNWbm1yMC95MWtjOVBrTjU3QWFNdE1kemp6cGlwUEFFY3BiWnMyV3FwQWlhcUIxcGs5YThCKzY4eGJEL21FREVjWmhsZ0tvVXVCZWJtUFJCNnV6V2JUbWU2UjZMd2prRHprT0duSUJIWVZBbGxza1R1Sy9TaGJsUG9GMWhpQVNDc3l3S3pkM0o5OFppQ1pPNkVtaXNqdWR0Rlh5S0RpY3NEc0R4V0tUWmZhSXRNNklOYXJRdy9RUjZqSENESlU1d09HT0lPR094TXo4QXgyN1J3cXd3N0l2RUNkYkFuVytCT3k5eE9NbkdqbWZJWjdRd0h4N1pKSXU1WFdOb0ZNQ2Q3aENjQ0Q4VEhxSm1pK0NlUmVIMEVwOUlHelNKWTR1NG1HU1JsdWVrbUhWbjBjSVVpV1hxR080cmFTZHdnOFBSdjBrV0xZNitYL3lrNWZiN0dMRUdMVVkwMG9PVzhLQ0o5SFV0Y2ZFNTZzZk8vbzI0TWc0c0EwWnczMGZocEVGRlVNV2Q3T0JMd3FVTXRrWUxjL0E4RXgvU1ZyMk9kV2RIWis5eW9LSFFhekdjTStEdXNzVDErakdmWk5QVjVCaC96dXFsSG5ERTJUdGdnUnJRRjNrSTdnL1g4cjBUTnA5WDZsVzhSODNzaUUvejJPRXphZ0p1VndrTURqNy91YTBZUnQ5aGZKYnRNNC9GVHBBVGJYbVNkKzNmcTNmM1p4NTEvRG42SitKZzJrY2NpZFFhVVg4QnNoYzhnMHB5NnJKMnpSWkRRMFYwUkwxd1VudmhoQUxMV0p5NWNNNmhzMjMvTmw5T3VodGtYV05yckx1OW1WemZmN1hXMHhaQlcwVUxjNFVkdTAwczg4Z0h4NWJuWkF3UEdBNGE0TmlIQytlSzlYYzFCRGo3UE9KQjlSdTE1S1FMWkg1NDJiOGpuRFdKRTJXQUJnZC9FUndBZlIzajh6cVFzZFhZTnFZU0Q0OFJhWU8yekFDdEtMQzhaMEIvTzBZbm5NcnhxWDUraXJWK0hXdnZzdGl4cWVUa1A4K3JJeDZrUGZuSGN4WTdha08wYkh2SzZmZkFyVDhBaHpXUnR1L0xtdmhMakM2NVlZcVlUNnRFNXBUbHJaTFFheEUwVnVtaW54TjMxQkF0cUJDY3FySHVUU0xvc2RpVnZIcVgvWkRYbjQ1eURaTzRKcnpFVjNLQ2QzbzMxelhQNTJ6cmQ3VjdLbUx0M2RIdW44cllaU1FNdG9temZJdC9uWTFZRHlnS3ZRYUZjMWt2Uk53TzZnZ2FPZEtDdFE4OTR6TTFQNlR0cUZseTZZdDlRQXZqRVlXZWh1R1UvYW9uTEMrK2c5K1BWekdWK2IxS25FSDdlRHA3cm9mSGVOYjlpQWR0ekFOVjFrTU03N2Rkalhzc3MxU3ZNZ3lOVmV3RzY3ZTUwT1h3SlE0L2s0ZWhjVWdjdTRtMDVSbmpWL1hnVjF3bFBNZ2w3bS8yZW5mS1NJR0V6SThJVGxleEhqU0paYXB4YThwZU54N1R3VXQ5Y0FLT29mRXpmclVKWnl1MHRGZVJOdWpIeGZ6ejMvV08xMmRtVFhUdTMrNTN0U0pQNEY0RlZ2NUxqci8wb2c1VDhYZTY0aDlxK1krOTVhcWYwSmRuY04zVERtZit6UzdZbldhaHY2MjU1VWZsMjgwYmM1c29rN3NXODZ1WkxRcE5jYWxwcXpKTFZnOWpyTEVHZlNxenBUTllXN3pQRXNkZVIrRTgvNXlWMlNuRzc0RnpWVGZDampjWFBGNjR5RmF4ZHNTN3F5MGplZjVVb3c3bEdGaWpERGoyam53Njh2bks5eGY4NFhTTGpubGR4NUN0Q0I5Y2NMR0ticVo1YjlIUlMyK1Z2aHhsMS8vV1Zpa1BXS2FJb1YzSVhNT09mY0FPVzhXNnQvTzFYRTNjVVkzZ3RJd1A1YzVmZ1dheUt6UHBTeFI2eGNVdmE1VDVpeEgxd3psTDNka0F5VHh4QXptMzVRbTNoYXdWc2JQTU1IejNUM3luUjV2a241cjVjQytJUG1meFNuMy93OWxkckh2cXhZZlJ4NC9LdC8vZEtGdk1Ham5LLzNXNWVKQXlrY3p3dmtUS2pTSktlVkc1VjFYOTI0MVNrVHpsK0h3UGVLYnMrenZBWFo0eVRyT2kzS1F2SkFLdE9ZdkN1U29MTEdtN0JCZElNN2FFTDdORXkxbE1UWnBBVmlHSE5hZzFkeEdjYmlLWU1OSytHNFBXWEdLSEhZQTc3UlBYM0pKaUxwOUwxQTJXU1JWcklJdWhyVWFhVEZCU3lhWWJPN2FLUThTQWErYUprMzMvWGc0UW8zSUZISU1oelZhN0JtSGxPOElEanNPY0lUbk1odk1TV0EvQ3ArYVhtTzhONEF3YXREQjNaeCtBYXpKQzVZQnRNRDhybTdrOWZWN3FjK21QdFBmU29JUDE5QkU0YzBHS3lkam5pVWlzKytOL2h4VXhIN1JvVmpaUklWcC9kL3lQWWRMRXVzY3NhcFNvbFh2ejR1cTNROExmYlMwNnlXYmFvSTY3NGNmTEk2M3VFOHZrR080WjJaVmYvV0txazFINTFlZGVqcnYxdkQ2dUJ5MkdaRHd1T2t4aEZIb2kxb01EZUdBUDgzQXk5Z3V6alRYQkluMDI5dVZ3Q2grMkZpMmJ4T252Q0I5OHRhaWhFYTBqM05iS091TElTMnhaUE5Qc0RlYXNSUHNqY3pndTZITmExY3BRdWIyOWZTciswMXVVellha3c5NzFkZmVQMTlYb3FYaTV0dzU3Mi81VHNhWkZNdXg5S1pPbjRueDdIajRWdlo0azRaVzRsZWhFeWpjTXh5bXJ1azI5SGhaaTJEdCtRSGk1SGo4VmxVaEp0NE9VUlkxcGtXNk9CMjdma0hzVVJEbk8wbUV2eDFWT1Nia1JmK1IxTFc1VGtwZEQ5VTY3MDAvcU50bFpzeFQycE56VzZiNysrSnppdXRta1BiekZsT0dZcFQxYVNLdWVsSmU5dDR4V2RWcDg3REI4S3E2L0JmUnZ1cHlyQkNacDkybmhHVGVzVnI3OVB3QUEvLy91Umd6MEt4RUFBQT09"
+    },
+    "kind": "Secret",
+    "metadata": {
+        "creationTimestamp": "2023-08-23T15:10:57Z",
+        "labels": {
+            "modifiedAt": "1692803458",
+            "name": "currency-jpy-miscroserive",
+            "owner": "helm",
+            "status": "deployed",
+            "version": "1"
+        },
+        "name": "sh.helm.release.v1.currency-jpy-miscroserive.v1",
+        "namespace": "default",
+        "resourceVersion": "11438",
+        "uid": "045f5a44-78d0-4aff-a50b-f40b8e0f9cb6"
+    },
+    "type": "helm.sh/release.v1"
+
+
+
+- **we want to decode the release from the encoded release secret, type** kubectl get secret sh.helm.release.v1.currency-jpy-miscroserive.v1 -o json | jq .data.release | tr -d '"'
+
+
+
+<aside>
+💡 NOTE: Kubernetes Secrets are base64-encoded for storage
+
+</aside>
+
+
+
+vagrant@HelloCloud-Boxes:~/helm-cop/1-svc_and_ep$ kubectl get secret sh.helm.release.v1.currency-jpy-miscroserive.v1 -o json | jq .data.release | tr -d '"'
+SDRzSUFBQUFBQUFDLzV4WVhYT2J1QnIrS3g3T2JaTEZVTnJZTTcwd05JQXdkbXM3UnFDVE16dENFSkF0Z1dyQU50N3BmejhqL0JHM1NidmJ2Y2dFR2VuOWVON24vUkIvS1FYbXFUSlVTTFBacEFWcGIxZWl2ZVcwSXB1eVNqZDBteW8zQ2kyZVMyWDRsL0pNTjFYOVo1SUtWckubectl get secret sh.helm.release.v1.currency-jpy-miscroserive.v1 -o json | jq .data.release | tr -d '"'lpwb2d3VlRkWDBXL1grVnRNZis4YXdydzZORDNmNi9VRFRqWUg2SGlrM0NzTy9lU0JKV1ZwM1c3dEZSVFpVMUxRc2xLRUNpcXJHalBWSXlZWGNwTndvVlkzcnBsS0d5a1hGdHh1RjVIaFRTM041V3VNRTExZysvK2dsRmtLNVViYnBwam9LVisvNmQrb3JsYU9lbXpMZTZ5VDJuc3ROenpxZDcwM29FYUF0SmRJUUxHaHdrYlhWdWw5RThFcDYzUXBwQlJhQ1VZSTdKZDl1RkZhU3RUSXNHc1p1bERybGd1RTZyWlRoZnk5V1gzNzg0ODg4WlNMZFZIZTFZTkxhempzbDFhdnRPQk4yNnBwNXpHZFo0dVFNT0VZZXcyVVdhOUZwUFMyajBGUDlyUHpxNi8yQlZkUWYvSVc1UmhDSm1DOHp3S2Q5VW5nczVsUERoL2FPV0VZVHdUNERkRlEvaCtvNDFhc2FPSE9HdU4yUDNWbm1yMC95MWtjOVBrTjU3QWFNdE1kemp6cGlwUEFFY3BiWnMyV3FwQWlhcUIxcGs5YThCKzY4eGJEL21FREVjWmhsZ0tvVXVCZWJtUFJCNnV6V2JUbWU2UjZMd2prRHprT0duSUJIWVZBbGxza1R1Sy9TaGJsUG9GMWhpQVNDc3l3S3pkM0o5OFppQ1pPNkVtaXNqdWR0Rlh5S0RpY3NEc0R4V0tUWmZhSXRNNklOYXJRdy9RUjZqSENESlU1d09HT0lPR094TXo4QXgyN1J3cXd3N0l2RUNkYkFuVytCT3k5eE9NbkdqbWZJWjdRd0h4N1pKSXU1WFdOb0ZNQ2Q3aENjQ0Q4VEhxSm1pK0NlUmVIMEVwOUlHelNKWTR1NG1HU1JsdWVrbUhWbjBjSVVpV1hxR080cmFTZHdnOFBSdjBrV0xZNitYL3lrNWZiN0dMRUdMVVkwMG9PVzhLQ0o5SFV0Y2ZFNTZzZk8vbzI0TWc0c0EwWnczMGZocEVGRlVNV2Q3T0JMd3FVTXRrWUxjL0E4RXgvU1ZyMk9kV2RIWis5eW9LSFFhekdjTStEdXNzVDErakdmWk5QVjVCaC96dXFsSG5ERTJUdGdnUnJRRjNrSTdnL1g4cjBUTnA5WDZsVzhSODNzaUUvejJPRXphZ0p1VndrTURqNy91YTBZUnQ5aGZKYnRNNC9GVHBBVGJYbVNkKzNmcTNmM1p4NTEvRG42SitKZzJrY2NpZFFhVVg4QnNoYzhnMHB5NnJKMnpSWkRRMFYwUkwxd1VudmhoQUxMV0p5NWNNNmhzMjMvTmw5T3VodGtYV05yckx1OW1WemZmN1hXMHhaQlcwVUxjNFVkdTAwczg4Z0h4NWJuWkF3UEdBNGE0TmlIQytlSzlYYzFCRGo3UE9KQjlSdTE1S1FMWkg1NDJiOGpuRFdKRTJXQUJnZC9FUndBZlIzajh6cVFzZFhZTnFZU0Q0OFJhWU8yekFDdEtMQzhaMEIvTzBZbm5NcnhxWDUraXJWK0hXdnZzdGl4cWVUa1A4K3JJeDZrUGZuSGN4WTdha08wYkh2SzZmZkFyVDhBaHpXUnR1L0xtdmhMakM2NVlZcVlUNnRFNXBUbHJaTFFheEUwVnVtaW54TjMxQkF0cUJDY3FySHVUU0xvc2RpVnZIcVgvWkRYbjQ1eURaTzRKcnpFVjNLQ2QzbzMxelhQNTJ6cmQ3VjdLbUx0M2RIdW44cllaU1FNdG9temZJdC9uWTFZRHlnS3ZRYUZjMWt2Uk53TzZnZ2FPZEtDdFE4OTR6TTFQNlR0cUZseTZZdDlRQXZqRVlXZWh1R1UvYW9uTEMrK2c5K1BWekdWK2IxS25FSDdlRHA3cm9mSGVOYjlpQWR0ekFOVjFrTU03N2Rkalhzc3MxU3ZNZ3lOVmV3RzY3ZTUwT1h3SlE0L2s0ZWhjVWdjdTRtMDVSbmpWL1hnVjF3bFBNZ2w3bS8yZW5mS1NJR0V6SThJVGxleEhqU0paYXB4YThwZU54N1R3VXQ5Y0FLT29mRXpmclVKWnl1MHRGZVJOdWpIeGZ6ejMvV08xMmRtVFhUdTMrNTN0U0pQNEY0RlZ2NUxqci8wb2c1VDhYZTY0aDlxK1krOTVhcWYwSmRuY04zVERtZit6UzdZbldhaHY2MjU1VWZsMjgwYmM1c29rN3NXODZ1WkxRcE5jYWxwcXpKTFZnOWpyTEVHZlNxenBUTllXN3pQRXNkZVIrRTgvNXlWMlNuRzc0RnpWVGZDampjWFBGNjR5RmF4ZHNTN3F5MGplZjVVb3c3bEdGaWpERGoyam53Njh2bks5eGY4NFhTTGpubGR4NUN0Q0I5Y2NMR0ticVo1YjlIUlMyK1Z2aHhsMS8vV1Zpa1BXS2FJb1YzSVhNT09mY0FPVzhXNnQvTzFYRTNjVVkzZ3RJd1A1YzVmZ1dheUt6UHBTeFI2eGNVdmE1VDVpeEgxd3psTDNka0F5VHh4QXptMzVRbTNoYXdWc2JQTU1IejNUM3luUjV2a241cjVjQytJUG1meFNuMy93OWxkckh2cXhZZlJ4NC9LdC8vZEtGdk1Ham5LLzNXNWVKQXlrY3p3dmtUS2pTSktlVkc1VjFYOTI0MVNrVHpsK0h3UGVLYnMrenZBWFo0eVRyT2kzS1F2SkFLdE9ZdkN1U29MTEdtN0JCZElNN2FFTDdORXkxbE1UWnBBVmlHSE5hZzFkeEdjYmlLWU1OSytHNFBXWEdLSEhZQTc3UlBYM0pKaUxwOUwxQTJXU1JWcklJdWhyVWFhVEZCU3lhWWJPN2FLUThTQWErYUprMzMvWGc0UW8zSUZISU1oelZhN0JtSGxPOElEanNPY0lUbk1odk1TV0EvQ3ArYVhtTzhONEF3YXREQjNaeCtBYXpKQzVZQnRNRDhybTdrOWZWN3FjK21QdFBmU29JUDE5QkU0YzBHS3lkam5pVWlzKytOL2h4VXhIN1JvVmpaUklWcC9kL3lQWWRMRXVzY3NhcFNvbFh2ejR1cTNROExmYlMwNnlXYmFvSTY3NGNmTEk2M3VFOHZrR080WjJaVmYvV0txazFINTFlZGVqcnYxdkQ2dUJ5MkdaRHd1T2t4aEZIb2kxb01EZUdBUDgzQXk5Z3V6alRYQkluMDI5dVZ3Q2grMkZpMmJ4T252Q0I5OHRhaWhFYTBqM05iS091TElTMnhaUE5Qc0RlYXNSUHNqY3pndTZITmExY3BRdWIyOWZTciswMXVVellha3c5NzFkZmVQMTlYb3FYaTV0dzU3Mi81VHNhWkZNdXg5S1pPbjRueDdIajRWdlo0azRaVzRsZWhFeWpjTXh5bXJ1azI5SGhaaTJEdCtRSGk1SGo4VmxVaEp0NE9VUlkxcGtXNk9CMjdma0hzVVJEbk8wbUV2eDFWT1Nia1JmK1IxTFc1VGtwZEQ5VTY3MDAvcU50bFpzeFQycE56VzZiNysrSnppdXRta1BiekZsT0dZcFQxYVNLdWVsSmU5dDR4V2RWcDg3REI4S3E2L0JmUnZ1cHlyQkNacDkybmhHVGVzVnI3OVB3QUEvLy91Umd6MEt4RUFBQT09
+vagrant@HelloCloud-Boxes:~/helm-cop/1-svc_and_ep$
+
+
+
+
+- **Decode command**
+
+    **1st Step** **“kubectl get secret sh.helm.release.v1.currency-jpy-miscroserive.v1 -o json | jq .data.release | tr -d '"' | base64 -d”**
+
+
+
+vagrant@HelloCloud-Boxes:~/helm-cop/1-svc_and_ep$ kubectl get secret sh.helm.release.v1.currency-jpy-miscroserive.v1 -o json | jq .data.release | tr -d '"' | base64 -d
+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vagrant@HelloCloud-Boxes:~/helm-cop/1-svc_and_ep$
+
+
+
+**And Decode again**
+
+**2nd Step** “**kubectl get secret sh.helm.release.v1.currency-jpy-miscroserive.v1 -o json | jq .data.release | tr -d '"' | base64 -d | base64 -d”**
+
+
+agrant@HelloCloud-Boxes:~/helm-cop/1-svc_and_ep$ kubectl get secret sh.helm.release.v1.currency-jpy-miscroserive.v1 -o json | jq .data.release | tr -d '"' | base64 -d | base64 -d
+��X]s���+�m��P��3�04�0vk;F��3;B�-�j�6��?#��I�۽���x���)�2TH�٤ioW���"��J7t�*7
+-�Ke���L7U�g�
+V�i�
+    M��[��V��ư��w��@Ӎ��)7
+ÿy IYZw[�EE6TԴ,����ƌ�HɅܤ�(U��R��Eŷ�xSKsyZ��X>��%B�Q��:
+W��w�+����2��$���M�:��M��-%�,hp��պ_D�Jz�
+i�Q�;%�nV��2,�n�:��:���/V_~���<e"�Tw�`���;%ի�8v�y�gY��
+                                                      8F�ek�i=-��S�������U����F��/3��}Rx,�SÇ��XF�>tT?��8ի8s��ݏ�Y�O��G=>Cy����s�:b��r�ٳe���i�ּ�Ű��@�q�e������A���m9����9�C���GaP%����҅�O�]a���,
+j�0�z�p�%Np8c�8c�3?�n�¬0��-3�   ���o�;/q8�Ǝg�g�0�$��]ch���?�f���E���H�c���d��礘ug���e��+i'p��ѿI-��_������-F4҃���u-q�9������2,Fp�G�AEPŝ��K¥
+                                �F
+                                  s�<�V��ugGg�r���k1�3�����1�d�����p��;`�����6�W�U�G��O���3jnW
+                                                                                                >���F�a|��3��N�my�w�߫w�gu�9�'�`�G��Q�<�Jr�v�CCEtD�pR{��X��pΡ�m�6_N�]ck����\����A[E
+                                                                        s��M,��ǖ�d
+                                                                                  �؇
+                                                                                    ��w58�<�A��
+                                                                                               d~xٿ#�5�e���&��Wr�wz7�5��l�w�{*b������e$�~k�ر���?ϫ#�=��s;jC�l{�����?�5���˚�K�.�a��O�D�孒�k4V颟w�-�����M"�ؕ�z���ן�r
+                              ���|���X(
+��sY/D�9҂�=�35?���Yr�}@
+                       �������',/��ߏW1���J�A�x:{���x���m�U�C
+                                                            �]�{,�T�2
+                                                                     �U�뷹���%?���qH�����W��W\%<�%�o�zw�H�NW�4�e�qk�^7��K}p���3~�        g+��W�6���������gfMt���w�"O�^V�K����S�w��j���媟Зgp��g��.؝f�����G����(���-
+Mq�i�2KVc��}*��3X[���^G�<����)��sU77<^��V�vĻ�-#y�T��X�
+                                                      8��|:������t��y]ǐ\p��n�yo��Ko��e���V)X���]�\Î}�[ź��\M�Q�ഌ��_�f�+3�Kz��/k�����9K���<q9��    ������0|�O|�G�䟚�p/�>g�J}���]�{�Ň�Ǐʷ��([�9��u�x�2���Dʍ"JyQ�WU�ۍR�<��|x���;�]�2N��ܤ/$�9�¹*
+�Ik ���F�LPRɦ��CĀk打}�^�r�!�V�a�;��Ü!9̆�X§旘��5w�n"�0Ҿ�\b��;��ܒb.�K�
+ �0wg�k2B�m0?+��=}^�s鏴�Ҡ���8sA����H����1�hV6Q!Zw��a�ĺ�,j���{���C��m-:�fڠ�����#�����ٕ_�b��Q���^����>�-�d<.:Laz"փx`�p2�
+            ��5�"}6��p
+�D�#s8.�sZ��P���}*��[�͆����u�����x��{��S��E2�})���|{>��$ᕸ��D�7
+                                                             �)��M�b�;~@x�?�HI���E�i�n�nߐ{D9��a/�UNI��u-nS��C�N��O�6�Y����������٤=�Ŕᘥ=ZH�������VuZ|�0|*���o���&i�i�7�V��?���F
+                                                                    �+vagrant@HelloCloud-Boxes:~/helm-cop/1-svc_and_ep$
+
+
+
+**3rd Step “kubectl get secret sh.helm.release.v1.currency-jpy-miscroserive.v1 -o json | jq .data.release | tr -d '"' | base64 -d” | gzip -d**
+
+agrant@HelloCloud-Boxes:~/helm-cop/1-svc_and_ep$ kubectl get secret sh.helm.release.v1.currency-jpy-miscroserive.v1 -o json | jq .data.release | tr -d '"' | base64 -d | base64 -d | gzip -d
+{"name":"currency-jpy-miscroserive","info":{"first_deployed":"2023-08-23T15:10:57.389235906Z","last_deployed":"2023-08-23T15:10:57.389235906Z","deleted":"","description":"Install complete","status":"deployed"},"chart":{"metadata":{"name":"currency-app","version":"0.1.0","description":"A Helm chart for Currency Microservice","apiVersion":"v2","appVersion":"0.1.0","type":"application"},"lock":null,"templates":[{"name":"templates/_helpers.tpl","data":"e3svKgpFeHBhbmQgdGhlIG5hbWUgb2YgdGhlIGNoYXJ0LgoqL319Cnt7LSBkZWZpbmUgImN1cnJlbmN5LWFwcC5uYW1lIiAtfX0Ke3stIGRlZmF1bHQgLkNoYXJ0Lk5hbWUgLlZhbHVlcy5uYW1lT3ZlcnJpZGUgfCB0cnVuYyA2MyB8IHRyaW1TdWZmaXggIi0iIH19Cnt7LSBlbmQgfX0KCnt7LyoKQ3JlYXRlIGEgZGVmYXVsdCBmdWxseSBxdWFsaWZpZWQgYXBwIG5hbWUuCldlIHRydW5jYXRlIGF0IDYzIGNoYXJzIGJlY2F1c2Ugc29tZSBLdWJlcm5ldGVzIG5hbWUgZmllbGRzIGFyZSBsaW1pdGVkIHRvIHRoaXMgKGJ5IHRoZSBETlMgbmFtaW5nIHNwZWMpLgpJZiByZWxlYXNlIG5hbWUgY29udGFpbnMgY2hhcnQgbmFtZSBpdCB3aWxsIGJlIHVzZWQgYXMgYSBmdWxsIG5hbWUuCiovfX0Ke3stIGRlZmluZSAiY3VycmVuY3ktYXBwLmZ1bGxuYW1lIiAtfX0Ke3stIGlmIC5WYWx1ZXMuZnVsbG5hbWVPdmVycmlkZSB9fQp7ey0gLlZhbHVlcy5mdWxsbmFtZU92ZXJyaWRlIHwgdHJ1bmMgNjMgfCB0cmltU3VmZml4ICItIiB9fQp7ey0gZWxzZSB9fQp7ey0gJG5hbWUgOj0gZGVmYXVsdCAuQ2hhcnQuTmFtZSAuVmFsdWVzLm5hbWVPdmVycmlkZSB9fQp7ey0gaWYgY29udGFpbnMgJG5hbWUgLlJlbGVhc2UuTmFtZSB9fQp7ey0gLlJlbGVhc2UuTmFtZSB8IHRydW5jIDYzIHwgdHJpbVN1ZmZpeCAiLSIgfX0Ke3stIGVsc2UgfX0Ke3stIHByaW50ZiAiJXMtJXMiIC5SZWxlYXNlLk5hbWUgJG5hbWUgfCB0cnVuYyA2MyB8IHRyaW1TdWZmaXggIi0iIH19Cnt7LSBlbmQgfX0Ke3stIGVuZCB9fQp7ey0gZW5kIH19Cgp7ey8qCkNyZWF0ZSBjaGFydCBuYW1lIGFuZCB2ZXJzaW9uIGFzIHVzZWQgYnkgdGhlIGNoYXJ0IGxhYmVsLgoqL319Cnt7LSBkZWZpbmUgImN1cnJlbmN5LWFwcC5jaGFydCIgLX19Cnt7LSBwcmludGYgIiVzLSVzIiAuQ2hhcnQuTmFtZSAuQ2hhcnQuVmVyc2lvbiB8IHJlcGxhY2UgIisiICJfIiB8IHRydW5jIDYzIHwgdHJpbVN1ZmZpeCAiLSIgfX0Ke3stIGVuZCB9fQoKe3svKgpDb21tb24gbGFiZWxzCiovfX0Ke3stIGRlZmluZSAiY3VycmVuY3ktYXBwLmxhYmVscyIgLX19CmhlbG0uc2gvY2hhcnQ6IHt7IGluY2x1ZGUgImN1cnJlbmN5LWFwcC5jaGFydCIgLiB9fQp7eyBpbmNsdWRlICJjdXJyZW5jeS1hcHAuc2VsZWN0b3JMYWJlbHMiIC4gfX0Ke3stIGlmIC5DaGFydC5BcHBWZXJzaW9uIH19CmFwcC5rdWJlcm5ldGVzLmlvL3ZlcnNpb246IHt7IC5DaGFydC5BcHBWZXJzaW9uIHwgcXVvdGUgfX0Ke3stIGVuZCB9fQphcHAua3ViZXJuZXRlcy5pby9tYW5hZ2VkLWJ5OiB7eyAuUmVsZWFzZS5TZXJ2aWNlIH19Cnt7LSBlbmQgfX0KCnt7LyoKU2VsZWN0b3IgbGFiZWxzCiovfX0Ke3stIGRlZmluZSAiY3VycmVuY3ktYXBwLnNlbGVjdG9yTGFiZWxzIiAtfX0KYXBwLmt1YmVybmV0ZXMuaW8vbmFtZToge3sgaW5jbHVkZSAiY3VycmVuY3ktYXBwLm5hbWUiIC4gfX0KYXBwLmt1YmVybmV0ZXMuaW8vaW5zdGFuY2U6IHt7IC5SZWxlYXNlLk5hbWUgfX0Ke3stIGVuZCB9fQoKe3svKgpDcmVhdGUgdGhlIG5hbWUgb2YgdGhlIHNlcnZpY2UgYWNjb3VudCB0byB1c2UKKi99fQp7ey0gZGVmaW5lICJjdXJyZW5jeS1hcHAuc2VydmljZUFjY291bnROYW1lIiAtfX0Ke3stIGlmIC5WYWx1ZXMuc2VydmljZUFjY291bnQuY3JlYXRlIH19Cnt7LSBkZWZhdWx0IChpbmNsdWRlICJjdXJyZW5jeS1hcHAuZnVsbG5hbWUiIC4pIC5WYWx1ZXMuc2VydmljZUFjY291bnQubmFtZSB9fQp7ey0gZWxzZSB9fQp7ey0gZGVmYXVsdCAiZGVmYXVsdCIgLlZhbHVlcy5zZXJ2aWNlQWNjb3VudC5uYW1lIH19Cnt7LSBlbmQgfX0Ke3stIGVuZCB9fQo="},{"name":"templates/pod.yaml","data":"YXBpVmVyc2lvbjogdjEKa2luZDogUG9kCm1ldGFkYXRhOgogIG5hbWU6IGN1cnJlbmN5LXt7IC5WYWx1ZXMuY3VycmVuY3ljb2RlIH19LWFwcAogIGxhYmVsczoKICAgIGFwcDoge3sgLlZhbHVlcy5jdXJyZW5jeWNvZGUgfX0tbWljcm9zZXJ2aWNlCnNwZWM6CiAgY29udGFpbmVyczoKICAtIG5hbWU6IGN1cnJlbmN5LXt7IC5WYWx1ZXMuY3VycmVuY3ljb2RlIH19CiAgICBpbWFnZTogaGFzaGljb3JwL2h0dHAtZWNobzowLjIuMwogICAgYXJnczoKICAgICAgLSAiLXRleHQ9ZmVhdHVyZSBhdmFpbGFibGUgaW4ge3sgLlZhbHVlcy5jdXJyZW5jeWNvZGUgfX0iCiAgICAgIC0gLWxpc3Rlbj06e3sgLlZhbHVlcy5wb3J0IH19CiAgIA=="}],"values":{"currencycode":"JPY","port":8003},"schema":null,"files":[{"name":".helmignore","data":"IyBQYXR0ZXJucyB0byBpZ25vcmUgd2hlbiBidWlsZGluZyBwYWNrYWdlcy4KIyBUaGlzIHN1cHBvcnRzIHNoZWxsIGdsb2IgbWF0Y2hpbmcsIHJlbGF0aXZlIHBhdGggbWF0Y2hpbmcsIGFuZAojIG5lZ2F0aW9uIChwcmVmaXhlZCB3aXRoICEpLiBPbmx5IG9uZSBwYXR0ZXJuIHBlciBsaW5lLgouRFNfU3RvcmUKIyBDb21tb24gVkNTIGRpcnMKLmdpdC8KLmdpdGlnbm9yZQouYnpyLwouYnpyaWdub3JlCi5oZy8KLmhnaWdub3JlCi5zdm4vCiMgQ29tbW9uIGJhY2t1cCBmaWxlcwoqLnN3cAoqLmJhawoqLnRtcAoqLm9yaWcKKn4KIyBWYXJpb3VzIElERXMKLnByb2plY3QKLmlkZWEvCioudG1wcm9qCi52c2NvZGUvCg=="}]},"config":{"currencycode":"jpy","port":8003},"manifest":"---\n# Source: currency-app/templates/pod.yaml\napiVersion: v1\nkind: Pod\nmetadata:\n  name: currency-jpy-app\n  labels:\n    app: jpy-microservice\nspec:\n  containers:\n  - name: currency-jpy\n    image: hashicorp/http-echo:0.2.3\n    args:\n      - \"-text=feature available in jpy\"\n      - -listen=:8003\n","version":1,"namespace":"default"}vagrant@HelloCloud-Boxes:~/helm-cop/1-svc_and_ep$
+
+
+
+**4th** **Step “kubectl get secret sh.helm.release.v1.currency-jpy-miscroserive.v1 -o json | jq .data.release | tr -d '"' | base64 -d” | gzip -d | jq”**
+
+vagrant@HelloCloud-Boxes:~/helm-cop/1-svc_and_ep$ kubectl get secret sh.helm.release.v1.currency-jpy-miscroserive.v1 -o json | jq .data.release | tr -d '"' | base64 -d | base64 -d | gzip -d | jq
+{
+  "name": "currency-jpy-miscroserive",
+  "info": {
+    "first_deployed": "2023-08-23T15:10:57.389235906Z",
+    "last_deployed": "2023-08-23T15:10:57.389235906Z",
+    "deleted": "",
+    "description": "Install complete",
+    "status": "deployed"
+  },
+  "chart": {
+    "metadata": {
+      "name": "currency-app",
+      "version": "0.1.0",
+      "description": "A Helm chart for Currency Microservice",
+      "apiVersion": "v2",
+      "appVersion": "0.1.0",
+      "type": "application"
+    },
+    "lock": null,
+    "templates": [
+      {
+        "name": "templates/_helpers.tpl",
+        "data": "e3svKgpFeHBhbmQgdGhlIG5hbWUgb2YgdGhlIGNoYXJ0LgoqL319Cnt7LSBkZWZpbmUgImN1cnJlbmN5LWFwcC5uYW1lIiAtfX0Ke3stIGRlZmF1bHQgLkNoYXJ0Lk5hbWUgLlZhbHVlcy5uYW1lT3ZlcnJpZGUgfCB0cnVuYyA2MyB8IHRyaW1TdWZmaXggIi0iIH19Cnt7LSBlbmQgfX0KCnt7LyoKQ3JlYXRlIGEgZGVmYXVsdCBmdWxseSBxdWFsaWZpZWQgYXBwIG5hbWUuCldlIHRydW5jYXRlIGF0IDYzIGNoYXJzIGJlY2F1c2Ugc29tZSBLdWJlcm5ldGVzIG5hbWUgZmllbGRzIGFyZSBsaW1pdGVkIHRvIHRoaXMgKGJ5IHRoZSBETlMgbmFtaW5nIHNwZWMpLgpJZiByZWxlYXNlIG5hbWUgY29udGFpbnMgY2hhcnQgbmFtZSBpdCB3aWxsIGJlIHVzZWQgYXMgYSBmdWxsIG5hbWUuCiovfX0Ke3stIGRlZmluZSAiY3VycmVuY3ktYXBwLmZ1bGxuYW1lIiAtfX0Ke3stIGlmIC5WYWx1ZXMuZnVsbG5hbWVPdmVycmlkZSB9fQp7ey0gLlZhbHVlcy5mdWxsbmFtZU92ZXJyaWRlIHwgdHJ1bmMgNjMgfCB0cmltU3VmZml4ICItIiB9fQp7ey0gZWxzZSB9fQp7ey0gJG5hbWUgOj0gZGVmYXVsdCAuQ2hhcnQuTmFtZSAuVmFsdWVzLm5hbWVPdmVycmlkZSB9fQp7ey0gaWYgY29udGFpbnMgJG5hbWUgLlJlbGVhc2UuTmFtZSB9fQp7ey0gLlJlbGVhc2UuTmFtZSB8IHRydW5jIDYzIHwgdHJpbVN1ZmZpeCAiLSIgfX0Ke3stIGVsc2UgfX0Ke3stIHByaW50ZiAiJXMtJXMiIC5SZWxlYXNlLk5hbWUgJG5hbWUgfCB0cnVuYyA2MyB8IHRyaW1TdWZmaXggIi0iIH19Cnt7LSBlbmQgfX0Ke3stIGVuZCB9fQp7ey0gZW5kIH19Cgp7ey8qCkNyZWF0ZSBjaGFydCBuYW1lIGFuZCB2ZXJzaW9uIGFzIHVzZWQgYnkgdGhlIGNoYXJ0IGxhYmVsLgoqL319Cnt7LSBkZWZpbmUgImN1cnJlbmN5LWFwcC5jaGFydCIgLX19Cnt7LSBwcmludGYgIiVzLSVzIiAuQ2hhcnQuTmFtZSAuQ2hhcnQuVmVyc2lvbiB8IHJlcGxhY2UgIisiICJfIiB8IHRydW5jIDYzIHwgdHJpbVN1ZmZpeCAiLSIgfX0Ke3stIGVuZCB9fQoKe3svKgpDb21tb24gbGFiZWxzCiovfX0Ke3stIGRlZmluZSAiY3VycmVuY3ktYXBwLmxhYmVscyIgLX19CmhlbG0uc2gvY2hhcnQ6IHt7IGluY2x1ZGUgImN1cnJlbmN5LWFwcC5jaGFydCIgLiB9fQp7eyBpbmNsdWRlICJjdXJyZW5jeS1hcHAuc2VsZWN0b3JMYWJlbHMiIC4gfX0Ke3stIGlmIC5DaGFydC5BcHBWZXJzaW9uIH19CmFwcC5rdWJlcm5ldGVzLmlvL3ZlcnNpb246IHt7IC5DaGFydC5BcHBWZXJzaW9uIHwgcXVvdGUgfX0Ke3stIGVuZCB9fQphcHAua3ViZXJuZXRlcy5pby9tYW5hZ2VkLWJ5OiB7eyAuUmVsZWFzZS5TZXJ2aWNlIH19Cnt7LSBlbmQgfX0KCnt7LyoKU2VsZWN0b3IgbGFiZWxzCiovfX0Ke3stIGRlZmluZSAiY3VycmVuY3ktYXBwLnNlbGVjdG9yTGFiZWxzIiAtfX0KYXBwLmt1YmVybmV0ZXMuaW8vbmFtZToge3sgaW5jbHVkZSAiY3VycmVuY3ktYXBwLm5hbWUiIC4gfX0KYXBwLmt1YmVybmV0ZXMuaW8vaW5zdGFuY2U6IHt7IC5SZWxlYXNlLk5hbWUgfX0Ke3stIGVuZCB9fQoKe3svKgpDcmVhdGUgdGhlIG5hbWUgb2YgdGhlIHNlcnZpY2UgYWNjb3VudCB0byB1c2UKKi99fQp7ey0gZGVmaW5lICJjdXJyZW5jeS1hcHAuc2VydmljZUFjY291bnROYW1lIiAtfX0Ke3stIGlmIC5WYWx1ZXMuc2VydmljZUFjY291bnQuY3JlYXRlIH19Cnt7LSBkZWZhdWx0IChpbmNsdWRlICJjdXJyZW5jeS1hcHAuZnVsbG5hbWUiIC4pIC5WYWx1ZXMuc2VydmljZUFjY291bnQubmFtZSB9fQp7ey0gZWxzZSB9fQp7ey0gZGVmYXVsdCAiZGVmYXVsdCIgLlZhbHVlcy5zZXJ2aWNlQWNjb3VudC5uYW1lIH19Cnt7LSBlbmQgfX0Ke3stIGVuZCB9fQo="
+      },
+      {
+        "name": "templates/pod.yaml",
+        "data": "YXBpVmVyc2lvbjogdjEKa2luZDogUG9kCm1ldGFkYXRhOgogIG5hbWU6IGN1cnJlbmN5LXt7IC5WYWx1ZXMuY3VycmVuY3ljb2RlIH19LWFwcAogIGxhYmVsczoKICAgIGFwcDoge3sgLlZhbHVlcy5jdXJyZW5jeWNvZGUgfX0tbWljcm9zZXJ2aWNlCnNwZWM6CiAgY29udGFpbmVyczoKICAtIG5hbWU6IGN1cnJlbmN5LXt7IC5WYWx1ZXMuY3VycmVuY3ljb2RlIH19CiAgICBpbWFnZTogaGFzaGljb3JwL2h0dHAtZWNobzowLjIuMwogICAgYXJnczoKICAgICAgLSAiLXRleHQ9ZmVhdHVyZSBhdmFpbGFibGUgaW4ge3sgLlZhbHVlcy5jdXJyZW5jeWNvZGUgfX0iCiAgICAgIC0gLWxpc3Rlbj06e3sgLlZhbHVlcy5wb3J0IH19CiAgIA=="
+      }
+    ],
+    "values": {
+      "currencycode": "JPY",
+      "port": 8003
+    },
+    "schema": null,
+    "files": [
+      {
+        "name": ".helmignore",
+        "data": "IyBQYXR0ZXJucyB0byBpZ25vcmUgd2hlbiBidWlsZGluZyBwYWNrYWdlcy4KIyBUaGlzIHN1cHBvcnRzIHNoZWxsIGdsb2IgbWF0Y2hpbmcsIHJlbGF0aXZlIHBhdGggbWF0Y2hpbmcsIGFuZAojIG5lZ2F0aW9uIChwcmVmaXhlZCB3aXRoICEpLiBPbmx5IG9uZSBwYXR0ZXJuIHBlciBsaW5lLgouRFNfU3RvcmUKIyBDb21tb24gVkNTIGRpcnMKLmdpdC8KLmdpdGlnbm9yZQouYnpyLwouYnpyaWdub3JlCi5oZy8KLmhnaWdub3JlCi5zdm4vCiMgQ29tbW9uIGJhY2t1cCBmaWxlcwoqLnN3cAoqLmJhawoqLnRtcAoqLm9yaWcKKn4KIyBWYXJpb3VzIElERXMKLnByb2plY3QKLmlkZWEvCioudG1wcm9qCi52c2NvZGUvCg=="
+      }
+    ]
+  },
+  "config": {
+    "currencycode": "jpy",
+    "port": 8003
+  },
+  "manifest": "---\n# Source: currency-app/templates/pod.yaml\napiVersion: v1\nkind: Pod\nmetadata:\n  name: currency-jpy-app\n  labels:\n    app: jpy-microservice\nspec:\n  containers:\n  - name: currency-jpy\n    image: hashicorp/http-echo:0.2.3\n    args:\n      - \"-text=feature available in jpy\"\n      - -listen=:8003\n",
+  "version": 1,
+  "namespace": "default"
+}
+vagrant@HelloCloud-Boxes:~/helm-cop/1-svc_and_ep$
+
+
+
+
+- **Practice helm update (Modify Pod.yaml  under template file and values.yaml files)**
+
+Before update pod.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: currency-{{ .Values.currencycode }}-app
+  labels:
+    app: {{ .Values.currencycode }}-microservice
+spec:
+  containers:
+  - name: currency-{{ .Values.currencycode }}
+    image: hashicorp/http-echo:0.2.3
+    args:
+      - "-text=feature available in {{ .Values.currencycode }}"
+      - -listen=:{{ .Values.port }}
+
+
+After updated pod yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: currency-{{ .Values.currencycode }}-app
+  labels:
+    app: {{ .Values.currencycode }}-microservice
+    version: {{ .Values.version }}
+spec:
+  containers:
+  - name: currency-{{ .Values.currencycode }}
+    image: hashicorp/http-echo:0.2.3
+    args:
+      - "-text=feature available in {{ .Values.currencycode }}"
+      - -listen=:{{ .Values.port }}
+
+
+
+
+- **Add “version: v1” line in all values.yaml**
+
+currencycode: jpy
+port: 8003
+version: v1
+
+currencycode: sgd
+port: 8002
+version: v1
+
+currencycode: usd
+port: 8001
+version: v1
+
+
+ helm upgrade currency-jpy-miscroserive ./currency-app/ -f values-jpy.yaml 
+
+vagrant@HelloCloud-Boxes:~/helm-cop/1-svc_and_ep$ helm upgrade currency-jpy-miscroserive ./currency-app/ -f values-jpy.yaml
+Release "currency-jpy-miscroserive" has been upgraded. Happy Helming!
+NAME: currency-jpy-miscroserive
+LAST DEPLOYED: Wed Aug 23 17:32:32 2023
+NAMESPACE: default
+STATUS: deployed
+REVISION: 3
+TEST SUITE: None
+vagrant@HelloCloud-Boxes:~/helm-cop/1-svc_and_ep$
+
+
+
+
+- **Verify update pod, kubectl get pod currency-jpy-miscroserive -o yaml**
+- **Verify helm history**
+
+
+
+helm history currency-jpy-miscroserive 
+REVISION        UPDATED                         STATUS          CHART                   APP VERSION     DESCRIPTION     
+1               Wed Aug 23 15:10:57 2023        superseded      currency-app-0.1.0      0.1.0           Install complete
+2               Wed Aug 23 17:31:01 2023        superseded      currency-app-0.1.0      0.1.0           Upgrade complete
+3               Wed Aug 23 17:32:32 2023        deployed        currency-app-0.1.0      0.1.0           Upgrade complete
+vagrant@HelloCloud-Boxes:~/helm-cop/1-svc_and_ep$
+
+
+
+- **Helm Rollbak (helm rollback release name revision**)
+
+vagrant@HelloCloud-Boxes:~/helm-cop/1-svc_and_ep$ helm rollback curren
+cy-jpy-miscroserive 1 
+Rollback was a success! Happy Helming!
+vagrant@HelloCloud-Boxes:~/helm-cop/1-svc_and_ep$
+
+
